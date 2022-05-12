@@ -31,7 +31,7 @@ def load_or_download(sess, file_path, url, download_delay):
             logging.info(f"{file_path} not available.")
             raise ValueError('Results not available.')
         os.makedirs(os.path.dirname(file_path), exist_ok=True)
-        print(os.path.dirname(file_path))
+        logging.debug(f"file path: {os.path.dirname(file_path)}")
         with open(file_path, 'w') as f:
             json.dump(data, f)
     return data
