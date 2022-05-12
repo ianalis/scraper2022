@@ -103,8 +103,8 @@ def download_data(sess, node_dir, node_url, download_delay):
                         time.sleep(RETRY_WAIT)
 
     else: # download COC
-        # there should be at most 1 result for a node
-        assert len(node_info['pps']) < 2
+        # there should be at most 1 result for a node if not country
+        assert node_info['can'] == 'Country' or len(node_info['pps']) < 2
 
         for coc in node_info['pps']:
             # download COC if it doesn't exist
