@@ -11,6 +11,7 @@ from requests.packages.urllib3.poolmanager import PoolManager
 
 BASE_URL = 'https://2022electionresults.comelec.gov.ph/data'
 BASE_DIR = 'data'
+RETRY_WAIT = 1
 
 urljoin = lambda *args: '/'.join(args)
 
@@ -54,7 +55,14 @@ def download_data(sess, node_dir, node_url, download_delay):
     # check if info file of this node exists; download from node_url if not
     info_path = os.path.join(BASE_DIR, 'results', node_dir, 'info.json')
     info_url = urljoin(BASE_URL, 'regions', node_url)
-    node_info = load_or_download(sess, info_path, info_url, download_delay)
+    while True:
+        try:
+            node_info = load_or_download(sess, info_path, info_url, download_delay)
+            break
+        except ValueError:
+            # temporary error, sleep then try again
+            logging.info('Error encountered. Sleeping before retrying...')
+            time.sleep(RETRY_WAIT)
 
     # download data of all children
     for child in node_info['srs'].values():
@@ -83,7 +91,16 @@ def download_data(sess, node_dir, node_url, download_delay):
                                             f'{contest}.json')
                 contest_url = urljoin(BASE_URL, 'contests', 
                                       f'{contest}.json')
-                load_or_download(sess, contest_path, contest_url, download_delay)
+                while True:
+                    try:
+                        load_or_download(sess, contest_path, contest_url, download_delay)
+                        break
+                    except ValueError:
+                        # temporary error, sleep then try again
+                        logging.info(
+                            'Error encountered. Sleeping before retrying...'
+                        )
+                        time.sleep(RETRY_WAIT)
 
     else: # download COC
         # there should be at most 1 result for a node
