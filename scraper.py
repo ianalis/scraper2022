@@ -11,11 +11,10 @@ from requests.packages.urllib3.poolmanager import PoolManager
 
 BASE_URL = 'https://2022electionresults.comelec.gov.ph/data'
 BASE_DIR = 'data'
-DOWNLOAD_DELAY = 0.5
 
 urljoin = lambda *args: '/'.join(args)
 
-def load_or_download(sess, file_path, url):
+def load_or_download(sess, file_path, url, download_delay):
     """Read file_path if it exists, download from url if it doesn't"""
     logging.debug(f'In load_or_download: {file_path}, {url}')
     if os.path.exists(file_path):
@@ -27,7 +26,7 @@ def load_or_download(sess, file_path, url):
             logging.info(f"{file_path} doesn't exists, "
                          f"downloading from {url}...")
             data = sess.get(url).json()
-            time.sleep(DOWNLOAD_DELAY)
+            time.sleep(download_delay)
         except json.JSONDecodeError:
             logging.info(f"{file_path} not available.")
             raise ValueError('Results not available.')
@@ -37,7 +36,7 @@ def load_or_download(sess, file_path, url):
             json.dump(data, f)
     return data
 
-def download_data(sess, node_dir, node_url):
+def download_data(sess, node_dir, node_url, download_delay):
     """Recursively download data, skipping already downloaded files
     
     Parameters
@@ -48,18 +47,20 @@ def download_data(sess, node_dir, node_url):
         the directory path of this node
     node_url : str
         url of this node as given by the srs field of the parent
+    download_delay : float
+        minimum delay between successive downloads
     """
     logging.info(f'In download_data: {node_dir}, {node_url}')
     # check if info file of this node exists; download from node_url if not
     info_path = os.path.join(BASE_DIR, 'results', node_dir, 'info.json')
     info_url = urljoin(BASE_URL, 'regions', node_url)
-    node_info = load_or_download(sess, info_path, info_url)
+    node_info = load_or_download(sess, info_path, info_url, download_delay)
 
     # download data of all children
     for child in node_info['srs'].values():
         child_dir = os.path.join(node_dir,
                                  child['rn'].replace('/', '_'))
-        download_data(sess, child_dir, child['url']+'.json')
+        download_data(sess, child_dir, child['url']+'.json', download_delay)
 
     if node_info['can'] == 'Barangay': # download ER if barangay
         for precinct in node_info['pps']:
@@ -71,7 +72,7 @@ def download_data(sess, node_dir, node_url):
                                    precinct['vbs'][0]['url']+'.json')
             try:
                 precinct_results = load_or_download(sess, precinct_path, 
-                                                    precinct_url)
+                                                    precinct_url, download_delay)
             except ValueError: # no ER yet
                 continue
 
@@ -82,7 +83,7 @@ def download_data(sess, node_dir, node_url):
                                             f'{contest}.json')
                 contest_url = urljoin(BASE_URL, 'contests', 
                                       f'{contest}.json')
-                load_or_download(sess, contest_path, contest_url)
+                load_or_download(sess, contest_path, contest_url, download_delay)
 
     else: # download COC
         # there should be at most 1 result for a node
@@ -94,7 +95,7 @@ def download_data(sess, node_dir, node_url):
             assert len(coc['vbs']) == 1
             coc_url = urljoin(BASE_URL, 'results', coc['vbs'][0]['url']+'.json')
             try:
-                load_or_download(sess, coc_path, coc_url)
+                load_or_download(sess, coc_path, coc_url, download_delay)
             except ValueError: # no COC yet
                 continue
 
@@ -116,7 +117,7 @@ def main(base_dir, download_delay, log_level):
                     'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) '
                     'AppleWebKit/537.36 (KHTML, like Gecko) '
                     'Chrome/101.0.4951.54 Safari/537.36'}
-    download_data(sess, '', 'root.json')
+    download_data(sess, '', 'root.json', download_delay)
 
 if __name__ == "__main__":
     main()
