@@ -31,6 +31,7 @@ def load_or_download(sess, file_path, url, download_delay):
         except json.JSONDecodeError:
             logging.info(f"{file_path} not available.")
             raise ValueError('Results not available.')
+        file_path = file_path.replace("*","_")
         os.makedirs(os.path.dirname(file_path), exist_ok=True)
         logging.debug(f"file path: {os.path.dirname(file_path)}")
         with open(file_path, 'w') as f:
